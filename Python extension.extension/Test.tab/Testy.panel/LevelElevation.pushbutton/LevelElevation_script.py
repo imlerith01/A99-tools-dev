@@ -99,7 +99,8 @@ def get_text_in_brackets(text, symbol_start, symbol_end):
 #==================================================
 if __name__ == '__main__':
     # Get all Levels
-    all_levels = FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Levels).WhereElementIsNotElementType().ToElements() # FilteredElementCollector is the common class for getting specific elements from Revit.
+    all_levels = FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Levels).WhereElementIsNotElementType().ToElements()
+    # FilteredElementCollector is the common class for getting specific elements from Revit.
 
     # DO NOT place Transaction inside of your loops! It will drastically reduce perfomance of your script.
     t = Transaction(doc, __title__)         # Transactions are context-like objects that guard any changes made to a Revit model. You need to use t.Start() and t.Commit() to make changes to a Project.
