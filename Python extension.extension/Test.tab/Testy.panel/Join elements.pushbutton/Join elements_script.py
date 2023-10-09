@@ -21,7 +21,7 @@ Author: Jakub Dvoracek"""                                                      #
 
 # ╦╔╦╗╔═╗╔═╗╦═╗╔╦╗╔═╗
 # ║║║║╠═╝║ ║╠╦╝ ║ ╚═╗
-# ╩╩ ╩╩  ╚═╝╩╚═ ╩ ╚═╝ IMPORTS
+# ╩╩ ╩╩  ╚═╝╩╚═ ╩ ╚═╝
 #==================================================
 # Regular + Autodesk
 import os
@@ -38,7 +38,7 @@ from System.Collections.Generic import List                         # List<Eleme
 
 # ╦  ╦╔═╗╦═╗╦╔═╗╔╗ ╦  ╔═╗╔═╗
 # ╚╗╔╝╠═╣╠╦╝║╠═╣╠╩╗║  ║╣ ╚═╗
-#  ╚╝ ╩ ╩╩╚═╩╩ ╩╚═╝╩═╝╚═╝╚═╝ VARIABLES
+#  ╚╝ ╩ ╩╩╚═╩╩ ╩╚═╝╩═╝╚═╝╚═╝
 #==================================================
 doc     = __revit__.ActiveUIDocument.Document                       # Document   class from RevitAPI that represents project. Used to Create, Delete, Modify and Query elements from the project.
 uidoc   = __revit__.ActiveUIDocument                                # UIDocument class from RevitAPI that represents Revit project opened in the Revit UI(user interface).
@@ -49,7 +49,7 @@ active_view= doc.ActiveView                                         #Gets active
 
 # ╔═╗╦ ╦╔╗╔╔═╗╔╦╗╦╔═╗╔╗╔╔═╗
 # ╠╣ ║ ║║║║║   ║ ║║ ║║║║╚═╗
-# ╚  ╚═╝╝╚╝╚═╝ ╩ ╩╚═╝╝╚╝╚═╝ FUNCTIONS
+# ╚  ╚═╝╝╚╝╚═╝ ╩ ╩╚═╝╝╚╝╚═╝
 #==================================================
 
 # Place local functions here. If you might use any functions in other scripts, consider placing it in the lib folder.
@@ -58,14 +58,14 @@ active_view= doc.ActiveView                                         #Gets active
 
 # ╔═╗╦  ╔═╗╔═╗╔═╗╔═╗╔═╗
 # ║  ║  ╠═╣╚═╗╚═╗║╣ ╚═╗
-# ╚═╝╩═╝╩ ╩╚═╝╚═╝╚═╝╚═╝ CLASSES
+# ╚═╝╩═╝╩ ╩╚═╝╚═╝╚═╝╚═╝
 #==================================================
 
 # Place local classes here. If you might use any classes in other scripts, consider placing it in the lib folder.
 
 # ╔╦╗╔═╗╦╔╗╔
 # ║║║╠═╣║║║║
-# ╩ ╩╩ ╩╩╝╚╝ MAIN
+# ╩ ╩╩ ╩╩╝╚╝
 #==================================================
 all_walls= FilteredElementCollector(doc,active_view.Id).OfCategory(BuiltInCategory.OST_Walls).WhereElementIsNotElementType().ToElements()
 all_floors= FilteredElementCollector(doc,active_view.Id).OfCategory(BuiltInCategory.OST_Floors).WhereElementIsNotElementType().ToElements()
@@ -82,6 +82,10 @@ element_count =int(0)
 
 for element1 in all_elements:
     for element2 in all_elements:
+        geo1=element1.get_Geometry(Options())
+        geo2 = element2.get_Geometry(Options())
+
+
         filterinstersect= ElementIntersectsElementFilter(element1)
         if element1 is not element2:
             if filterinstersect.PassesFilter(element2)and(not(JoinGeometryUtils.AreElementsJoined(doc,element1,element2))):
