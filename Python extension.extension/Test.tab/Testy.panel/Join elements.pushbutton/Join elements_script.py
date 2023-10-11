@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__title__ = "01 - Join visible elements in active view"                  # Name of the button displayed in Revit UI
+__title__ = "Join visible elements in active view"                  # Name of the button displayed in Revit UI
 __doc__ = """Version = 1.0
 Date    = 05.10.2023
 _____________________________________________________________________
@@ -80,21 +80,20 @@ t.Start()
 intersecting_elements=[]
 element_count =int(0)
 
+
 for element1 in all_elements:
     for element2 in all_elements:
-        geo1=element1.get_Geometry(Options())
-        geo2 = element2.get_Geometry(Options())
+        geo1 = element1.get_Geometry(Options())
+        filter_intersect = ElementIntersectsElementFilter(element1)
 
-
-        filterinstersect= ElementIntersectsElementFilter(element1)
         if element1 is not element2:
-            if filterinstersect.PassesFilter(element2)and(not(JoinGeometryUtils.AreElementsJoined(doc,element1,element2))):
+            if filter_intersect.PassesFilter(element2) and (not JoinGeometryUtils.AreElementsJoined(doc, element1, element2)):
                 intersecting_elements.append(element2)
-                element_count +=1
+                element_count += 1
                 try:
-                    JoinGeometryUtils.JoinGeometry(doc, element1,element2)
+                    JoinGeometryUtils.JoinGeometry(doc, element1, element2)
                 except Exception as e:
-                # Handle any exceptions that occur during the join operation
-                    print(f"Error joining walls: {str(e)}")
+                    # Handle any exceptions that occur during the join operation
+                    print("Error joining walls:", str(e))
 print(str(element_count) + " elements were joined")
 t.Commit()
