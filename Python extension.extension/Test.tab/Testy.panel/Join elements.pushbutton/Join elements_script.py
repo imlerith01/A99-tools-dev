@@ -67,7 +67,7 @@ active_view= doc.ActiveView                                         #Gets active
 # ║║║╠═╣║║║║
 # ╩ ╩╩ ╩╩╝╚╝
 #==================================================
-all_walls= FilteredElementCollector(doc,active_view.Id).OfCategory(BuiltInCategory.OST_Walls).WhereElementIsNotElementType().ToElements()
+all_walls= FilteredElementCollector(doc,active_view.Id).BuiltInCategoOfCategory(ry.OST_Walls).WhereElementIsNotElementType().ToElements()
 all_floors= FilteredElementCollector(doc,active_view.Id).OfCategory(BuiltInCategory.OST_Floors).WhereElementIsNotElementType().ToElements()
 all_ceilings= FilteredElementCollector(doc,active_view.Id).OfCategory(BuiltInCategory.OST_Ceilings).WhereElementIsNotElementType().ToElements()
 all_elements= []
