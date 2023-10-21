@@ -32,7 +32,7 @@ def get_centerPoint(room):
 						return	pt
 
 # UI CHOOSE THE OPTION
-context = ['All rooms in active view', 'Select Rooms']
+context = ['All rooms in active view', 'Select Rooms', 'All placed rooms in the project']
 user_input = forms.CommandSwitchWindow.show(context)
 
 # SELECT ROOMS
@@ -42,6 +42,9 @@ if user_input:
 	elif user_input == context[1]:
 		with forms.WarningBar(title='Pick rooms to centralize'):
 			rooms = revit.pick_elements_by_category(BIC.OST_Rooms)
+	elif user_input == context[2]:
+		rooms = DB.FilteredElementCollector(doc).OfCategory(BIC.OST_Rooms).WhereElementIsNotElementType().ToElements()
+		rooms = [room for room in rooms if room.Location is not None]  # Exclude unplaced rooms
 
 	# MOVE LOCATION POINTS
 	if rooms:
