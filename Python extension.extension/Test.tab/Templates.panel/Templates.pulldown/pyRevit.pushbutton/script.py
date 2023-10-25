@@ -94,4 +94,4 @@ if __name__ == '__main__':
     # Notify user that script is complete.
     print('-' * 50)
     print('Script is finished.')
-    print('Template has been developed by Erik Frits.')
+    print('Template has been developed by Jakub Dvořáček.')
