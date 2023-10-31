@@ -14,7 +14,7 @@ def get_linked_models_and_dwg():
 
     for elem in DB.FilteredElementCollector(doc).OfClass(DB.ImportInstance):
         if elem.IsLinked:
-            dwg_name = elem.Parameter[DB.BuiltInParameter.IMPORT_SYMBOL_NAME].AsString()
+            dwg_name = elem.Category.Name
             linked_elements.append((dwg_name, elem.Id))
 
     return linked_elements
