@@ -96,12 +96,10 @@ source_doc = forms.select_open_docs(title='Select source document', multiple= Fa
 source_materials= FilteredElementCollector(source_doc).OfCategory(BuiltInCategory.OST_Materials)
 filtered_materials=[]
 for material in source_materials:
-    filtered_materials.append(material.Name)
-selected_materials= forms.SelectFromList.show(filtered_materials, button_name='Select Material',multiselect=True)
-for m in selected_materials:
-    patternid=selected_materials.CutBackgroundPatternId
-    print(m)
-# name = "xxx"
-# new_material = Material.Create(doc, name)
+    filtered_materials.append((material,material.Name))
+selected_materials= forms.SelectFromList.show([x[1] for x in filtered_materials], button_name='Select Materials',multiselect=True)
+
+
+    #new_materials=Material.Create(doc,m)
 
 t.Commit()  # <- Transaction End
