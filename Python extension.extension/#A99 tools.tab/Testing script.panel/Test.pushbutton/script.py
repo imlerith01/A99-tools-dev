@@ -1,49 +1,53 @@
 import clr
 clr.AddReference('RevitAPI')
 clr.AddReference('RevitAPIUI')
-
-from Autodesk.Revit.DB import FilteredElementCollector, Dimension, Transaction, ReferenceArray
-from Autodesk.Revit.DB import Line, XYZ
+from Autodesk.Revit.DB import FilteredElementCollector, Transaction, Material, StorageType, FamilySymbol, BuiltInParameterGroup, FamilyInstance
+from Autodesk.Revit.UI.Selection import ObjectType
+from pyrevit import forms
 
 doc = __revit__.ActiveUIDocument.Document
-view = __revit__.ActiveUIDocument.ActiveGraphicalView
+uidoc = __revit__.ActiveUIDocument
 
-# Function to get all dimensions in the active view
-def get_dimensions(view):
-    return FilteredElementCollector(doc, view.Id).OfClass(Dimension)
+def get_materials():
+    collector = FilteredElementCollector(doc).OfClass(Material)
+    return {mat.Name: mat.Id for mat in collector}
 
-# Function to recreate a dimension
-def recreate_dimension(dimension):
-    # Extract necessary properties from the old dimension
-    line = dimension.Curve
-    references = dimension.References
+def apply_material_to_family_symbols(family_symbols, material_id):
+    with Transaction(doc, "Apply Material") as trans:
+        trans.Start()
+        for family_symbol in family_symbols:
+            for param_id in selected_params:
+                param = family_symbol.get_Parameter(param_id)
+                if param and param.IsReadOnly == False:
+                    param.Set(material_id)
+        trans.Commit()
 
-    refArray = ReferenceArray()
-    for ref in references:
-        refArray.Append(ref)
+def get_material_type_parameters(element):
+    if isinstance(element, FamilyInstance):
+        element_type = doc.GetElement(element.Symbol.Id)
+    else:
+        element_type = doc.GetElement(element.GetTypeId())
+    return [param for param in element_type.Parameters
+            if param.StorageType == StorageType.ElementId
+            and param.Definition.ParameterGroup == BuiltInParameterGroup.PG_MATERIALS]
 
-    # Create a new dimension
-    new_dimension = None
-    if refArray.Size > 1:
-        new_dimension = doc.Create.NewDimension(view, line, refArray)
+# Step 1: Select element
+selected_ref = uidoc.Selection.PickObject(ObjectType.Element, "Select an element")
+element = doc.GetElement(selected_ref.ElementId)
 
-    return new_dimension
+# Step 2: Choose material type parameters
+parameters = get_material_type_parameters(element)
+param_dict = {param.Definition.Name: param.Id for param in parameters}
+selected_param_names = forms.SelectFromList.show(sorted(param_dict.keys()), "Select Material Type Parameters", 600, 300, multiselect=True)
+selected_params = [param_dict[name] for name in selected_param_names]
 
-# Start a transaction to modify the document
-t = Transaction(doc, 'Delete and Recreate Dimensions')
-t.Start()
+# Step 3: Choose material
+materials = get_materials()
+selected_material_name = forms.SelectFromList.show(sorted(materials.keys()), "Select Material", 600, 300)
+selected_material_id = materials[selected_material_name]
 
-try:
-    dimensions = get_dimensions(view)
-    for dimension in dimensions:
-        # Recreate the dimension
-        new_dimension = recreate_dimension(dimension)
-
-        # Delete the old dimension if new one is created
-        if new_dimension:
-            doc.Delete(dimension.Id)
-
-    t.Commit()
-except Exception as e:
-    print("Error:", e)
-    t.RollBack()
+# Step 4: Apply material
+family_symbols = FilteredElementCollector(doc).OfClass(FamilySymbol).ToElements()
+family_id = element.Symbol.Family.Id if isinstance(element, FamilyInstance) else element.Family.Id
+family_symbols = [fs for fs in family_symbols if fs.Family.Id == family_id]
+apply_material_to_family_symbols(family_symbols, selected_material_id)
