@@ -1,77 +1,41 @@
+# -*- coding: utf-8 -*-
+from pyrevit import revit, DB, script, forms
 import clr
-clr.AddReference('RevitAPI')
-clr.AddReference('RevitAPIUI')
-clr.AddReference('System.Windows.Forms')
-clr.AddReference('System.Drawing')
+from Autodesk.Revit.DB import (FilteredElementCollector, Transaction, Material, StorageType, FamilySymbol,
+                               BuiltInParameterGroup, FamilyInstance)
+from Autodesk.Revit.UI.Selection import ObjectType
 
-from Autodesk.Revit.DB import FilteredElementCollector, BuiltInCategory, ElementId, Transaction
-from Autodesk.Revit.UI import TaskDialog
-from System.Windows.Forms import Application, Form, CheckedListBox, Button, DialogResult
-from System.Drawing import Size
 
-# Class to create a checklist form
-class ChecklistForm(Form):
-    def __init__(self, items):
-        self.checkedItems = []
-        self.InitializeComponent(items)
+doc = revit.doc
+uidoc = revit.uidoc
 
-    def InitializeComponent(self, items):
-        self.checkedListBox = CheckedListBox()
-        self.checkedListBox.Items.AddRange(items)
-        self.checkedListBox.CheckOnClick = True
-        self.checkedListBox.Size = Size(300, 200)
+# Step 1: User selects 1 element
+selected_ref = uidoc.Selection.PickObject(ObjectType.Element, "Select an element.")
+selected_element = doc.GetElement(selected_ref.ElementId)
 
-        self.button = Button()
-        self.button.Text = 'OK'
-        self.button.Click += self.button_click
-        self.button.Location = System.Drawing.Point(100, 210)
+# Step 2: Display list of material parameters
+material_params = []
+for param in selected_element.Parameters:
+    if param.Definition.ParameterGroup ==BuiltInParameterGroup.PG_MATERIALS:
+        material_params.append(param)
+material_params_type = []
+for param_type in selected_element.Symbol.Parameters:
+    if param_type.Definition.ParameterGroup ==BuiltInParameterGroup.PG_MATERIALS:
+        material_params.append(param_type)
 
-        self.Controls.Add(self.checkedListBox)
-        self.Controls.Add(self.button)
-        self.Size = Size(320, 260)
+param_dict = {param.Definition.Name: param.Id for param in material_params}
+selected_param_names = forms.SelectFromList.show(sorted(param_dict.keys()),
+                                                 "Select parameters", 600, 600, multiselect=True)
 
-    def button_click(self, sender, e):
-        self.checkedItems = [self.checkedListBox.Items[i] for i in range(self.checkedListBox.Items.Count) if self.checkedListBox.GetItemChecked(i)]
-        self.DialogResult = DialogResult.OK
+def get_materials():
+    collector = FilteredElementCollector(doc).OfClass(Material)
+    return {mat.Name: mat.Id for mat in collector}
 
-# Main function to list warnings and isolate elements
-def isolate_warnings_elements(doc, uidoc):
-    # Retrieve all warnings
-    warnings = doc.GetWarnings()
-    unique_warnings = set()
+# Step 3: Choose material
+materials = get_materials()
+selected_material_name = forms.SelectFromList.show(sorted(materials.keys()), "Select Material", 600, 300)
 
-    # Process warnings to get unique descriptions
-    for warning in warnings:
-        unique_warnings.add(warning.GetDescriptionText())
+#Get all family types
+selected_family= selected_element.Symbol.Family
+types_ids=selected_family.GetFamilySymbolIds()
 
-    # Display checklist form
-    form = ChecklistForm(list(unique_warnings))
-    Application.EnableVisualStyles()
-    result = form.ShowDialog()
-
-    if result == DialogResult.OK:
-        selected_warnings = form.checkedItems
-
-        # Collect elements to isolate
-        elements_to_isolate = set()
-        for warning in warnings:
-            if warning.GetDescriptionText() in selected_warnings:
-                elements_to_isolate.update(warning.GetFailingElements())
-
-        # Convert to ElementId set
-        element_ids = [ElementId(id) for id in elements_to_isolate]
-
-        # Start a transaction to modify the document
-        with Transaction(doc, "Isolate Warnings") as trans:
-            trans.Start()
-            view = uidoc.ActiveView
-            view.IsolateElementsTemporary(element_ids)
-            trans.Commit()
-
-        TaskDialog.Show("Isolation Complete", "Elements with the selected warnings have been isolated in the active view.")
-
-# Boilerplate code
-uidoc = __revit__.ActiveUIDocument
-doc = uidoc.Document
-
-isolate_warnings_elements(doc, uidoc)
