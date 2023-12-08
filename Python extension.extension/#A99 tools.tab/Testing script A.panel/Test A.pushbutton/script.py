@@ -1,90 +1,64 @@
-# -*- coding: utf-8 -*-
-"""Exports selected schedules to CSV files.
+import clr
+clr.AddReference('RevitAPI')
+clr.AddReference('RevitAPIUI')
+from Autodesk.Revit.DB import *
+from Autodesk.Revit.UI.Selection import ObjectType
+from pyrevit import forms, script
 
-Shift-Click:
-Pick from default output locations.
-"""
-#pylint: disable=C0103,E0401
+doc = __revit__.ActiveUIDocument.Document
+uidoc = __revit__.ActiveUIDocument
 
-import os.path as op
+# Function to select rooms
+def select_rooms():
+    selected_refs = uidoc.Selection.PickObjects(ObjectType.Element, "Select rooms")
+    rooms = [doc.GetElement(ref.ElementId) for ref in selected_refs if doc.GetElement(ref.ElementId).Category.Name == 'Rooms']
+    return rooms
 
-from pyrevit import forms
-from pyrevit import coreutils
-from pyrevit import revit, DB
-from pyrevit import script
+# Function to get all floor type names
+def get_floor_type_names():
+    floor_types = FilteredElementCollector(doc).OfClass(FloorType).ToElements()
+    floor_type_names = [ft.Name for ft in floor_types]
+    return floor_type_names
 
-from pyrevit.userconfig import user_config
+# Function to get floor type by name
+def get_floor_type_by_name(name):
+    floor_types = FilteredElementCollector(doc).OfClass(FloorType).ToElements()
+    for ft in floor_types:
+        if ft.Name == name:
+            return ft
+    return None
 
+# Function to create floor for each room
+def create_floors(rooms, floor_type):
+    with Transaction(doc, "Create Floors") as trans:
+        trans.Start()
+        for room in rooms:
+            level_id = room.LevelId
+            boundary = room.GetBoundarySegments(SpatialElementBoundaryOptions())[0]
+            curve_loop = CurveLoop.Create([seg.GetCurve() for seg in boundary])
+            floor = Floor.Create(doc, curve_loop, floor_type.Id, level_id)
+        trans.Commit()
 
-logger = script.get_logger()
-output = script.get_output()
+# Main script execution
+# Step 1: Select rooms
+rooms = select_rooms()
+if not rooms:
+    script.exit()
 
+# Step 2: Choose floor type
+floor_type_names = get_floor_type_names()
 
-open_exported = False
-incl_headers = False
-basefolder = ''
-# if user shift-clicks, default to user desktop,
-# otherwise ask for a folder containing the PDF files
-if __shiftclick__:  #pylint: disable=E0602
-    destopt, switches = forms.CommandSwitchWindow.show(
-        ["My Desktop", "Where Revit Model Is", "My Downloads", "User Select"],
-        switches=["Open CSV File","Include Headers"],
-        message="Select destination:")
-    if destopt == "My Desktop":
-        basefolder = op.expandvars('%userprofile%\\desktop')
-    elif destopt == "My Downloads":
-        basefolder = op.expandvars('%userprofile%\\downloads')
-    elif destopt == "Where Revit Model Is":
-        central_path = revit.query.get_central_path()
-        if central_path:
-            basefolder = op.dirname(central_path)
-        else:
-            basefolder = revit.query.get_project_info().location
-            if not basefolder:
-                forms.alert("Project has not been saved yet.", exitscript=True)
-    elif destopt == "User Select":
-        basefolder = forms.pick_folder()
-    open_exported = switches["Open CSV File"]
-    incl_headers = switches["Include Headers"]
-else:
-    basefolder = forms.pick_folder()
+if not floor_type_names:
+    forms.alert("No floor types found.")
+    script.exit()
 
+selected_floor_type_name = forms.SelectFromList.show(sorted(floor_type_names), "Select a Floor Type")
 
-if basefolder:
-    logger.debug(basefolder)
-    schedules_to_export = forms.select_schedules()
+if not selected_floor_type_name:
+    script.exit()
 
-    if schedules_to_export:
-        vseop = DB.ViewScheduleExportOptions()
-        if incl_headers:
-            vseop.ColumnHeaders = coreutils.get_enum_value(DB.ExportColumnHeaders,"OneRow")
-        else:
-            vseop.ColumnHeaders = coreutils.get_enum_none(DB.ExportColumnHeaders)
-        vseop.TextQualifier = DB.ExportTextQualifier.DoubleQuote
+selected_floor_type = get_floor_type_by_name(selected_floor_type_name)
 
-        # determine which separator to use
-        csv_sp = ','
-        regional_sep = user_config.get_list_separator()
-        if regional_sep != ',':
-            if forms.alert("Regional settings list separator is \"{}\"\n"
-                           "Do you want to use this instead of comma?"
-                           .format(regional_sep), yes=True, no=True):
-                csv_sp = regional_sep
-
-        if csv_sp:
-            vseop.FieldDelimiter = csv_sp
-            vseop.Title = False
-            vseop.HeadersFootersBlanks = False
-
-            for sched in schedules_to_export:
-                fname = \
-                    coreutils.cleanup_filename(revit.query.get_name(sched)) \
-                    + '.csv'
-                sched.Export(basefolder, fname, vseop)
-                exported = op.join(basefolder, fname)
-                revit.files.correct_text_encoding(exported)
-                output.print_md("**EXPORTED:** {0}"
-                                .format(revit.query.get_name(sched)))
-                print(exported)
-                if open_exported:
-                    coreutils.run_process('"%s"' % exported)
+# Step 3: Create floors
+create_floors(rooms, selected_floor_type)
+forms.alert('Floors created successfully.')

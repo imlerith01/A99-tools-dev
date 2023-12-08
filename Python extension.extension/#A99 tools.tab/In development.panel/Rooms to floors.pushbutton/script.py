@@ -90,4 +90,4 @@ if __name__ == '__main__':
     selected_floor_type = floor_types[selected_floor_type_name]
     floors_created = create_floors(rooms, selected_floor_type)
 
-    forms.alert(f'Floors created successfully: {floors_created} floors.')
+    forms.alert('Floors created successfully: {} floors.'.format(floors_created))
