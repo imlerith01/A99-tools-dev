@@ -4,11 +4,10 @@ __doc__ = """Version = 1.0
 Date    = 20.04.2022
 _____________________________________________________________________
 Description:
-This script creates floor by room outline
+This script creates floor by room outline, including openings.
 _____________________________________________________________________
 How-to:
 -> Click on the button
-
 _____________________________________________________________________
 
 To-Do:
@@ -54,20 +53,68 @@ def get_floor_types():
     all_floor_types = [f for f in all_floor_types if isinstance(f, FloorType)]
     return {Element.Name.GetValue(fr): fr for fr in all_floor_types}
 
+def room_to_floor(room, floor_type, doc):
+    new_floor = None
+    try:
+        # Make sure the room has an area (is bounded)
+        if not room.get_Parameter(BuiltInParameter.ROOM_AREA).AsDouble():
+            print("Room {} is not bounding.".format(room.Id))
+            return None
+
+        # Retrieve room boundaries
+        room_boundaries = room.GetBoundarySegments(SpatialElementBoundaryOptions())
+        if not room_boundaries:
+            print("No boundaries found for room {}.".format(room.Id))
+            return None
+
+        # First boundary is the room shape, others (if any) are openings
+        floor_shape = room_boundaries[0]
+        openings = list(room_boundaries)[1:] if len(room_boundaries) > 1 else []
+
+        # Create CurveLoop for the floor shape
+        curve_loop = CurveLoop.Create([seg.GetCurve() for seg in floor_shape])
+        curve_loops = List[CurveLoop]()
+        curve_loops.Add(curve_loop)
+
+        # Ensure that the level associated with the room is valid
+        room_level = doc.GetElement(room.LevelId)
+        if not isinstance(room_level, Level):
+            print("Invalid level for room {}.".format(room.Id))
+            return None
+
+        # Create the floor
+        with Transaction(doc, 'Create Floor') as trans:
+            trans.Start()
+            # Ensure correct Level ID is passed
+            new_floor = Floor.Create(doc, curve_loops, floor_type.Id, room_level.Id)
+            trans.Commit()
+
+        # Create openings in the floor if they exist
+        if openings and new_floor:
+            with Transaction(doc, 'Create Openings') as trans:
+                trans.Start()
+                for opening in openings:
+                    opening_curve_loop = CurveLoop.Create([seg.GetCurve() for seg in opening])
+                    doc.Create.NewOpening(new_floor, opening_curve_loop, False)
+                trans.Commit()
+            print("Floor created for room {} with openings.".format(room.Id))
+        else:
+            print("Floor created for room {} without openings.".format(room.Id))
+
+    except Exception as e:
+        print("Error creating floor for room {}: {}".format(room.Id, str(e)))
+
+    return new_floor
+
+
+
 def create_floors(rooms, floor_type):
-    """Create floors in the selected rooms with the specified floor type."""
+    """Create floors in the selected rooms with the specified floor type, including openings."""
     floors_created = 0
-    with Transaction(doc, "Create Floors") as trans:
-        trans.Start()
-        for room in rooms:
-            level_id = room.LevelId
-            boundary = room.GetBoundarySegments(SpatialElementBoundaryOptions())[0]
-            curve_loop = CurveLoop.Create([seg.GetCurve() for seg in boundary])
-            curve_loops = List[CurveLoop]()
-            curve_loops.Add(curve_loop)
-            if Floor.Create(doc, curve_loops, floor_type.Id, level_id):
-                floors_created += 1
-        trans.Commit()
+    for room in rooms:
+        new_floor = room_to_floor(room, floor_type, doc)
+        if new_floor:
+            floors_created += 1
     return floors_created
 
 # MAIN
