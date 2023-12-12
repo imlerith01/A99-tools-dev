@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__title__ = "Select mirrored\nWindows"                         # Name of the button displayed in Revit UI
+__title__ = "Select mirrored windows"                         # Name of the button displayed in Revit UI
 __doc__ = """Version = 1.0
 Date    = 20.04.2022
 _____________________________________________________________________
