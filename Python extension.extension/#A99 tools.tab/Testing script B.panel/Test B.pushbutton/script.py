@@ -1,93 +1,73 @@
-# -*- coding: utf-8 -*-
-__title__ = "Rooms to floors"  # Name of the button displayed in Revit UI
-__doc__ = """Version = 1.0
-Date    = 20.04.2022
-_____________________________________________________________________
-Description:
-This script creates floor by room outline
-_____________________________________________________________________
-How-to:
--> Click on the button
-
-_____________________________________________________________________
-
-To-Do:
-- 
-_____________________________________________________________________
-Author: Jakub Dvořáček"""  # Button Description shown in Revit UI
-
-# EXTRA: You can remove them.
-__author__ = "Jakub Dvořáček"  # Script's Author
-__helpurl__ = "https://atelier99cz.sharepoint.com/sites/Atelier99/SitePages/Main%20pages/BIM_Revit.aspx"  # Link that can be opened with F1 when hovered over the tool in Revit UI.
-
-# IMPORTS
 import clr
+import Autodesk.Revit.DB as DB
+import Autodesk.Revit.UI as UI
+from pyrevit import forms
+
+# Add references to Revit API
 clr.AddReference('RevitAPI')
-clr.AddReference('RevitAPIUI')
-from Autodesk.Revit.DB import *
-from Autodesk.Revit.UI.Selection import ObjectType
-from pyrevit import forms, script
-from System.Collections.Generic import List
-import os, sys, math, datetime, time
+clr.AddReference('RevitServices')
 
-# VARIABLES
-doc = __revit__.ActiveUIDocument.Document
-uidoc = __revit__.ActiveUIDocument
-app = __revit__.Application
-PATH_SCRIPT = os.path.dirname(__file__)
+# Import Document Manager
+from RevitServices.Persistence import DocumentManager
+from RevitServices.Transactions import TransactionManager
 
-# FUNCTIONS
+# Get the active document
+doc = DocumentManager.Instance.CurrentDBDocument
+uiapp = DocumentManager.Instance.CurrentUIApplication
+uidoc = uiapp.ActiveUIDocument
 
-def select_rooms():
-    """Select rooms in the Revit document."""
+# Function to list all linked models
+def list_linked_models():
+    collector = DB.FilteredElementCollector(doc).OfClass(DB.RevitLinkInstance)
+    return collector
+
+# Function to get the survey point location
+def get_survey_point_location():
+    # Assuming you want the Project Base Point
+    base_point = DB.FilteredElementCollector(doc).OfCategory(DB.BuiltInCategory.OST_ProjectBasePoint).ToElements()[0]
+    point = base_point.get_BoundingBox(None).Min
+    return point
+
+# Function to set the coordinates to the selected model
+def set_coordinates_to_model(link_instance, new_location):
+    TransactionManager.Instance.EnsureInTransaction(doc)
     try:
-        selected_refs = uidoc.Selection.PickObjects(ObjectType.Element, "Select rooms")
-        if not selected_refs:
-            return []
-        return [doc.GetElement(ref.ElementId) for ref in selected_refs]
+        link_instance.get_Parameter(DB.BuiltInParameter.BASEPOINT_EASTWEST_PARAM).Set(new_location.X)
+        link_instance.get_Parameter(DB.BuiltInParameter.BASEPOINT_NORTHSOUTH_PARAM).Set(new_location.Y)
+        link_instance.get_Parameter(DB.BuiltInParameter.BASEPOINT_ELEVATION_PARAM).Set(new_location.Z)
     except Exception as e:
-        return []
+        print("Error setting coordinates: {}".format(str(e)))
+    finally:
+        TransactionManager.Instance.TransactionTaskDone()
 
-def get_floor_types():
-    """Retrieve all available floor types from the Revit document."""
-    all_floor_types = FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Floors).WhereElementIsElementType().ToElements()
-    all_floor_types = [f for f in all_floor_types if isinstance(f, FloorType)]
-    return {Element.Name.GetValue(fr): fr for fr in all_floor_types}
+def main():
+    # List all linked models
+    linked_models = list_linked_models()
 
-def create_floors(rooms, floor_type):
-    """Create floors in the selected rooms with the specified floor type."""
-    floors_created = 0
-    with Transaction(doc, "Create Floors") as trans:
-        trans.Start()
-        for room in rooms:
-            level_id = room.LevelId
-            boundary = room.GetBoundarySegments(SpatialElementBoundaryOptions())[0]
-            curve_loop = CurveLoop.Create([seg.GetCurve() for seg in boundary])
-            curve_loops = List[CurveLoop]()
-            curve_loops.Add(curve_loop)
-            if Floor.Create(doc, curve_loops, floor_type.Id, level_id):
-                floors_created += 1
-        trans.Commit()
-    return floors_created
+    # Create a dictionary to map model names to their instances
+    model_dict = {lm.Name: lm for lm in linked_models}
 
-# MAIN
-if __name__ == '__main__':
-    rooms = select_rooms()
-    if not rooms:
-        forms.alert("No rooms selected. Exiting script.")
-        script.exit()
+    # Ask user to select a model from the list
+    selected_model_name = forms.SelectFromList.show(
+        sorted(model_dict.keys()),
+        title='Select a Linked Model',
+        multiselect=False
+    )
 
-    floor_types = get_floor_types()
-    if not floor_types:
-        forms.alert("No floor types found.")
-        script.exit()
+    if not selected_model_name:
+        forms.alert('No model selected, script will exit.')
+        return
 
-    selected_floor_type_name = forms.SelectFromList.show(sorted(floor_types.keys()), "Select a Floor Type")
-    if not selected_floor_type_name:
-        forms.alert("No floor type selected. Exiting script.")
-        script.exit()
+    # Get the selected model instance
+    selected_model = model_dict[selected_model_name]
 
-    selected_floor_type = floor_types[selected_floor_type_name]
-    floors_created = create_floors(rooms, selected_floor_type)
+    # Get the survey point location
+    survey_point_location = get_survey_point_location()
 
-    forms.alert(f'Floors created successfully: {floors_created} floors.')
+    # Set the coordinates to the selected model
+    set_coordinates_to_model(selected_model, survey_point_location)
+
+    # Inform the user
+    forms.alert('Coordinates set to the selected linked model.')
+
+main()
