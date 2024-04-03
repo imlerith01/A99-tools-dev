@@ -70,7 +70,7 @@ options.SpatialElementBoundaryLocation = b_option
 # WALL TYPE COLLECTOR
 def get_walls_types():
     """Retrieve all available floor types from the Revit document."""
-    all_wall_types = FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Walls).WhereElementIsElementType().ToElements()
+    all_wall_types = FilteredElementCollector(doc).OfCategory(BuiltinCategory.OST_Walls).WhereElementIsElementType().ToElements()
     all_wall_types = [f for f in all_wall_types if isinstance(f, WallType)]
     return {Element.Name.GetValue(fr): fr for fr in all_wall_types}
 
