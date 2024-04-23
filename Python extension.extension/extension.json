@@ -1,0 +1,14 @@
+{
+    "builtin": "False",
+    "default_enabled": "True",
+    "type": "extension",
+    "rocket_mode_compatible": "False",
+    "name": "#A99 tools",
+    "description": "Atelier 99 extensions for PyRevit",
+    "author": "Jakub Dvoracek",
+    "author_profile": "https://github.com/imlerith01",
+    "url": "https://github.com/imlerith01/A99-tools/tree/main/Python%20extension.extension.git",
+    "website": "https://github.com/imlerith01",
+    "image": "",
+    "dependencies": []
+}
