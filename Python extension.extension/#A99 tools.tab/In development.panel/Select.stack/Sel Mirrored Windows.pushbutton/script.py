@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__title__ = "Select mirrored windows"                         # Name of the button displayed in Revit UI
+__title__ = "Select mirrored windows"  # Name of the button displayed in Revit UI
 __doc__ = """Version = 1.0
 Date    = 20.04.2022
 _____________________________________________________________________
@@ -15,67 +15,37 @@ _____________________________________________________________________
 To-Do:
 - 
 _____________________________________________________________________
-Author: Jakub Dvořáček"""                                           # Button Description shown in Revit UI
+Author: Jakub Dvořáček"""  # Button Description shown in Revit UI
 
-# EXTRA: You can remove them.
-__author__ = "Jakub Dvořáček"                                   # Script's Author
-__helpurl__ = "https://atelier99cz.sharepoint.com/sites/Atelier99/SitePages/Main%20pages/BIM_Revit.aspx"     # Link that can be opened with F1 when hovered over the tool in Revit UI.
+import clr
+clr.AddReference('RevitAPI')
+clr.AddReference('RevitAPIUI')
+from Autodesk.Revit.DB import *
+from Autodesk.Revit.UI import TaskDialog
+from System.Collections.Generic import List
 
-# ╦╔╦╗╔═╗╔═╗╦═╗╔╦╗╔═╗
-# ║║║║╠═╝║ ║╠╦╝ ║ ╚═╗
-# ╩╩ ╩╩  ╚═╝╩╚═ ╩ ╚═╝ IMPORTS
-# ==================================================
-# Regular + Autodesk
-from Autodesk.Revit.DB import Transaction                               # or Import only classes that are used.
-from rpw import db, ui
+doc = __revit__.ActiveUIDocument.Document
+uidoc = __revit__.ActiveUIDocument
 
-# ╦  ╦╔═╗╦═╗╦╔═╗╔╗ ╦  ╔═╗╔═╗
-# ╚╗╔╝╠═╣╠╦╝║╠═╣╠╩╗║  ║╣ ╚═╗
-#  ╚╝ ╩ ╩╩╚═╩╩ ╩╚═╝╩═╝╚═╝╚═╝ VARIABLES
-# ==================================================
-doc   = __revit__.ActiveUIDocument.Document   # Document   class from RevitAPI that represents project. Used to Create, Delete, Modify and Query elements from the project.
-uidoc = __revit__.ActiveUIDocument          # UIDocument class from RevitAPI that represents Revit project opened in the Revit UI.
-app   = __revit__.Application                 # Represents the Autodesk Revit Application, providing access to documents, options and other application wide data and settings.
-
-
-# ╔═╗╦ ╦╔╗╔╔═╗╔╦╗╦╔═╗╔╗╔╔═╗
-# ╠╣ ║ ║║║║║   ║ ║║ ║║║║╚═╗
-# ╚  ╚═╝╝╚╝╚═╝ ╩ ╩╚═╝╝╚╝╚═╝ FUNCTIONS
-# ==================================================
-
-# Function to check if the window has the parameter 'Štítek' with value '#Okno'
 def has_required_label(window):
-    # Get the parameter definition by name
-    param_def = None
-    for p in window.Symbol.Parameters:
-        if p.Definition.Name == "Štítek":
-            param_def = p.Definition
-            break
-
-    if not param_def:
-        return False
-
-    param = window.Symbol.get_Parameter(param_def)
-    if param:
-        return param.AsString() == "#Okno"
-
+    param = window.Symbol.LookupParameter("Štítek")
+    if param and param.AsString() == "#Okno":
+        return True
     return False
-# ╔╦╗╔═╗╦╔╗╔
-# ║║║╠═╣║║║║
-# ╩ ╩╩ ╩╩╝╚╝ MAIN
-# ==================================================
+
 if __name__ == '__main__':
+    t = Transaction(doc, __title__)
+    t.Start()
 
-    t = Transaction(doc,__title__)  # Transactions are context-like objects that guard any changes made to a Revit model.
+    windows = FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Windows).WhereElementIsNotElementType().ToElements()
+    mirrored_windows_ids = List[ElementId]()
 
-    t.Start()  # <- Transaction Start
+    for window in windows:
+        if window.Mirrored and has_required_label(window):
+            mirrored_windows_ids.Add(window.Id)
 
-    # Use the updated method for retrieving elements
-    windows = db.Collector(of_category='Windows').get_elements(wrapped=True)
-    mirrored_windows = [x for x in windows if getattr(x, 'Mirrored', False) and has_required_label(x)]
-    msg = "There are " + str(len(mirrored_windows)) + " mirrored windows in the model"
-    ui.forms.Alert(msg, title="Mirrored Windows")
+    message = "There are {0} mirrored windows in the model.".format(mirrored_windows_ids.Count)
+    TaskDialog.Show("Mirrored Windows", message)
+    uidoc.Selection.SetElementIds(mirrored_windows_ids)
 
-    selection = ui.Selection(mirrored_windows)
-
-    t.Commit()  # <- Transaction End
+    t.Commit()

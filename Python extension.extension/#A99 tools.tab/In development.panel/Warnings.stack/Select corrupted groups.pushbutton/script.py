@@ -16,57 +16,33 @@ To-Do:
 _____________________________________________________________________
 Author: Jakub Dvořáček"""                                           # Button Description shown in Revit UI
 
-# EXTRA: You can remove them.
-__author__ = "Jakub Dvořáček"                                   # Script's Author
-__helpurl__ = "https://atelier99cz.sharepoint.com/sites/Atelier99/SitePages/Main%20pages/BIM_Revit.aspx"     # Link that can be opened with F1 when hovered over the tool in Revit UI.
 
-
-# ╦╔╦╗╔═╗╔═╗╦═╗╔╦╗╔═╗
-# ║║║║╠═╝║ ║╠╦╝ ║ ╚═╗
-# ╩╩ ╩╩  ╚═╝╩╚═ ╩ ╚═╝ IMPORTS
-# ==================================================
 import clr
 clr.AddReference('RevitAPI')
 clr.AddReference('RevitAPIUI')
 from Autodesk.Revit.DB import *
-from rpw import db, ui
+from Autodesk.Revit.UI import TaskDialog
 from System.Collections.Generic import List
 
-# ╦  ╦╔═╗╦═╗╦╔═╗╔╗ ╦  ╔═╗╔═╗
-# ╚╗╔╝╠═╣╠╦╝║╠═╣╠╩╗║  ║╣ ╚═╗
-#  ╚╝ ╩ ╩╩╚═╩╩ ╩╚═╝╩═╝╚═╝╚═╝ VARIABLES
-# ==================================================
-doc   = __revit__.ActiveUIDocument.Document   # Document   class from RevitAPI that represents project. Used to Create, Delete, Modify and Query elements from the project.
-uidoc = __revit__.ActiveUIDocument          # UIDocument class from RevitAPI that represents Revit project opened in the Revit UI.
-app   = __revit__.Application                 # Represents the Autodesk Revit Application, providing access to documents, options and other application wide data and settings.
+doc = __revit__.ActiveUIDocument.Document
+uidoc = __revit__.ActiveUIDocument
+app = __revit__.Application
 
-# ╔═╗╦ ╦╔╗╔╔═╗╔╦╗╦╔═╗╔╗╔╔═╗
-# ╠╣ ║ ║║║║║   ║ ║║ ║║║║╚═╗
-# ╚  ╚═╝╝╚╝╚═╝ ╩ ╩╚═╝╝╚╝╚═╝ FUNCTIONS
-# ==================================================
-# Method to isolate elements in a view
+def find_corrupted_groups(doc):
+    corrupted_groups_ids = List[ElementId]()  # Use .NET List to store ElementIds
+    groups = FilteredElementCollector(doc).OfClass(Group).WhereElementIsNotElementType().ToElements()
+    search_keyword = "vyloučené prvky"
+    for group in groups:
+        if search_keyword in group.Name:
+            corrupted_groups_ids.Add(group.Id)  # Add ElementId to the .NET List
+    return corrupted_groups_ids
 
-# ╔╦╗╔═╗╦╔╗╔
-# ║║║╠═╣║║║║
-# ╩ ╩╩ ╩╩╝╚╝ MAIN
-# ==================================================
+t = Transaction(doc, __title__)
+t.Start()
 
+corrupted_groups_ids = find_corrupted_groups(doc)
+message = 'There are {0} corrupted groups in the model.'.format(corrupted_groups_ids.Count)  # Use Count property of List
+TaskDialog.Show('Corrupted groups', message)
+uidoc.Selection.SetElementIds(corrupted_groups_ids)  # Pass the .NET List directly
 
-
-t = Transaction(doc,__title__)
-
-t.Start()  # <- Transaction Start
-
-groups = FilteredElementCollector(doc, doc.ActiveView.Id).OfClass(Group).WhereElementIsNotElementType().ToElements()
-cor_groups_ids = []
-str1 = "vyloučené prvky"
-for group in groups:
-    if str1 in group.Name:
-        cor_groups_ids.append(group)
-msg = "There are " + str(len(cor_groups_ids)) + " corrupted groups in the model"
-ui.forms.Alert(msg, title="Corrupted groups")
-
-selection = ui.Selection(cor_groups_ids)
-
-t.Commit()  # <- Transaction End
-
+t.Commit()
