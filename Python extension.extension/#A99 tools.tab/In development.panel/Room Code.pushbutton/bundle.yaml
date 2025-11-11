@@ -1,0 +1,4 @@
+title:
+  en_us: Room Code
+tooltip:
+  en_us: Builds room code from parameters "Část objektu", "Podlaží", "Obsazení", Číslo místnosti".
